@@ -9,7 +9,9 @@
 
 using namespace std;
 
-struct Autor {    // Clase Autor que habia designado en mi mapa, que tienen los elementos que dije
+// Clase Autor que habia designado en mi mapa, que tienen los elementos que dije
+
+struct Autor {    
     int id_autor;
     string nombre;
     string nacionalidad;
@@ -22,31 +24,26 @@ struct Autor {    // Clase Autor que habia designado en mi mapa, que tienen los 
     }
 };
 
-struct Libro {  //Clase Libro que tiene lo que habia dicho
+//Clase Libro que tiene lo que habia dicho
+
+struct Libro {
     int id_libro;
     string titulo;
-    int id_autor;
-    string genero;
+    string isbn;
+    string nombreAutor;   //En este caso se implemento el nombre autor en vez del ID, porque es mas sencillo para el usuario que conozca un nombre especifico y no un id puntual de un autor.
     bool estaDisponible;
     int anioPublicacion;
-    string usuario;
 
     Libro() : anioPublicacion(0), estaDisponible(true) {}
 
-    void mostrarDetallesCompletos(const vector<Autor>& autores) const {
-        cout << "---------------------------------" << endl;
-        cout << "Id: " << id_libro << endl;
+    void mostrarDetallesCompletos() const {
+        cout << "---------------------------------"<< endl;
+        cout << "Id del libro: " << id_libro << endl;
         cout << "Titulo: " << titulo << endl;
-        cout << "Genero: " << genero << endl;
-        cout << "Año de publicacion: " << anioPublicacion << endl;
+        cout << "ISBN: " << isbn << endl;
+        cout << "Anio de publicacion: " << anioPublicacion << endl;
+        cout << "Autor: " << nombreAutor << endl;
         cout << "Disponibilidad: " << (estaDisponible ? "Disponible" : "No disponible") << endl;
-
-        for (const auto& autor : autores) {
-            if (autor.id_autor == id_autor) {
-                cout << "Autor: " << autor.nombre << endl;
-                break;
-            }
-        }
     }
 };
 
@@ -72,16 +69,16 @@ struct Prestamo {     //Clase prestamo, para controlar mejor el movimiento
     }
 };
 
-struct Usuario {    //Clase usuario para tener un mejor flujo de gente
+struct Estudiante {    //Clase usuario para tener un mejor flujo de gente
     string nombre;
-    string trabajo;
+    string grado;
     int idUsuario;
     vector<Prestamo> prestamos;
 
     void mostrar() const {
         cout << "---------------------------------" << endl;
         cout << "Nombre: " << nombre << endl;
-        cout << "Trabajo: " << trabajo << endl;
+        cout << "Grado: " << grado << endl;
         cout << "ID: " << idUsuario << endl;
     }
 };
@@ -89,19 +86,51 @@ struct Usuario {    //Clase usuario para tener un mejor flujo de gente
 class Biblioteca { // Cada cosa que contiene la bilbioteca
 private:
     vector<Libro> coleccion;
-    vector<Usuario> usuarios;
+    vector<Estudiante> usuarios;
     vector<Autor> autores;
     vector<Prestamo> prestamos;
-
 public:
+    int generarIdLibro() {
+        if (coleccion.empty()) return 1;
+        int maxId = 0;
+        for (const auto& libro : coleccion) {
+            if (libro.id_libro > maxId) maxId = libro.id_libro;
+        }
+        return maxId + 1;
+    }
 
-    void agregarUsuario(const Usuario& nuevoUsuario);    //USUARIOS
-    Usuario*buscarusuarios(const string& nombre);        //USUARIOS
-    void mostrarUsuarios() const;                         //USUARIOS
+    int generarIdUsuario() {
+        if (usuarios.empty()) return 1;
+        int maxId = 0;
+        for (const auto& usuario : usuarios) {
+            if (usuario.idUsuario > maxId) maxId = usuario.idUsuario;
+        }
+        return maxId + 1;
+    }
+
+    int generarIdAutor() {
+        if (autores.empty()) return 1;
+        int maxId = 0;
+        for (const auto& autor : autores) {
+            if (autor.id_autor > maxId) maxId = autor.id_autor;
+        }
+        return maxId + 1;
+    }
+
+
+    void agregarUsuario(const Estudiante& nuevoUsuario);    //USUARIOS
+    Estudiante*buscarusuarios(const string& nombre);        //USUARIOS
+    void mostrarUsuarios() const;                           //USUARIOS
+    void actualizarUsuario(int idUsuario);
+    void eliminarUsuario(int idUsuario);
+
+    void mostrarPrestamosPorEstudiante(int idEstudiante);
 
     void agregarAutor(const Autor& nuevoAutor);              //Autor
-    Autor*buscarAutor(const string& nombre);                 //Autor
-    void mostrarAutor() const;                                //Autor
+    void mostrarAutor() const;                               //Autor
+    void actualizarAutor(int id_autor);
+    void eliminarAutor(int id_autor);
+    void mostrarAutoresConMasLibros() const;
 
     void agregarLibro(const Libro& nuevoLibro);   // Promesa de agregar un libro
 
@@ -113,6 +142,9 @@ public:
 
     void devolverLibro(const std::string& tituloDevolucion);    // Promesa de devolver libro
 
+    void actualizarLibro(int id_libro);
+    void eliminarLibro(int id_libro);
+
     void guardarLibros();  //Para cumplir el requisito de la fase 3 (Persistencia: Guarda/carga datos en archivos .txt (usa fstream para leer/escribir en formato CSV simple).)
     void guardarAutores();
     void guardarPrestamos();
@@ -121,94 +153,93 @@ public:
     void cargarDatos();    //Carga todos los datos de libro, autores, prestamos y usuarios
 };
 
-void Biblioteca::cargarDatos() { //Carga de datos
-    ifstream archivoLibros("libros.txt");       //Subir todo lo de los libros
+void Biblioteca::cargarDatos() { // Carga datos desde archivos .txt en forma de CSV
+    ifstream archivoLibros("libros.txt");       // Cargar libros
     if (archivoLibros.is_open()) {
         string line;
         while (getline(archivoLibros, line)) {
             stringstream ss(line);
             Libro nuevoLibro;
-            string id_libro, titulo, id_autor, genero, estaDisponible, anioPublicacion, usuario;
-            getline(ss, id_libro, ',');
-            getline(ss, titulo, ',');
-            getline(ss, id_autor, ',');
-            getline(ss, genero, ',');
-            getline(ss, estaDisponible, ',');
-            getline(ss, anioPublicacion, ',');
-            getline(ss, usuario, ',');
-            nuevoLibro.id_libro = stoi(id_libro);
-            nuevoLibro.titulo = titulo;
-            nuevoLibro.id_autor = stoi(id_autor);
-            nuevoLibro.genero = genero;
-            nuevoLibro.estaDisponible = (estaDisponible == "1");
-            nuevoLibro.anioPublicacion = stoi(anioPublicacion);
-            nuevoLibro.usuario = usuario;
+            string temp;
+            getline(ss, temp, ','); nuevoLibro.id_libro = stoi(temp);
+            getline(ss, nuevoLibro.titulo, ',');
+            getline(ss, nuevoLibro.isbn, ',');
+            getline(ss, temp, ','); nuevoLibro.anioPublicacion = stoi(temp);
+            getline(ss, nuevoLibro.nombreAutor, ',');
+            getline(ss, temp, ','); nuevoLibro.estaDisponible = (temp == "1");
             coleccion.push_back(nuevoLibro);
         }
         archivoLibros.close();
     }
 
-    ifstream archivoAutores("autores.txt");    //Subir todo lo de autores
+    ifstream archivoAutores("autores.txt");     // Cargar autores
     if (archivoAutores.is_open()) {
         string line;
         while (getline(archivoAutores, line)) {
             stringstream ss(line);
             Autor nuevoAutor;
-            string id_autor, nombre, nacionalidad;
-            getline(ss, id_autor, ',');
-            getline(ss, nombre, ',');
-            getline(ss, nacionalidad, ',');
-            nuevoAutor.id_autor = stoi(id_autor);
-            nuevoAutor.nombre = nombre;
-            nuevoAutor.nacionalidad = nacionalidad;
+            string temp;
+            getline(ss, temp, ','); nuevoAutor.id_autor = stoi(temp);
+            getline(ss, nuevoAutor.nombre, ',');
+            getline(ss, nuevoAutor.nacionalidad, ',');
             autores.push_back(nuevoAutor);
         }
         archivoAutores.close();
     }
 
-    ifstream archivoUsuarios("usuarios.txt");    //Usuarios toda la informacion
-    if (archivoUsuarios.is_open()) {
+    ifstream archivoEstudiantes("estudiantes.txt"); // Cargar usuarios (usando struct Estudiante)
+    if (archivoEstudiantes.is_open()) {
         string line;
-        while (getline(archivoUsuarios, line)) {
+        while (getline(archivoEstudiantes, line)) {
             stringstream ss(line);
-            Usuario nuevoUsuario;
-            string idUsuario, nombre, trabajo;
-            getline(ss, idUsuario, ',');
-            getline(ss, nombre, ',');
-            getline(ss, trabajo, ',');
-            nuevoUsuario.idUsuario = stoi(idUsuario);
-            nuevoUsuario.nombre = nombre;
-            nuevoUsuario.trabajo = trabajo;
+            Estudiante nuevoUsuario;
+            string temp;
+            getline(ss, temp, ','); nuevoUsuario.idUsuario = stoi(temp);
+            getline(ss, nuevoUsuario.nombre, ',');
+            getline(ss, nuevoUsuario.grado, ',');
             usuarios.push_back(nuevoUsuario);
         }
-        archivoUsuarios.close();
+        archivoEstudiantes.close();
     }
 
-    ifstream archivoPrestamos("prestamos.txt");            //Prestamos cargar la informacion
+    ifstream archivoPrestamos("prestamos.txt");    // Cargar prestamos
     if (archivoPrestamos.is_open()) {
         string line;
         while (getline(archivoPrestamos, line)) {
             stringstream ss(line);
             Prestamo nuevoPrestamo;
-            string id_prestamo, id_libro, idUsuario, fecha_prestamo, fecha_devolucion;
-            getline(ss, id_prestamo, ',');
-            getline(ss, id_libro, ',');
-            getline(ss, idUsuario, ',');
-            getline(ss, fecha_prestamo, ',');
-            getline(ss, fecha_devolucion, ',');
-            nuevoPrestamo.id_prestamo = stoi(id_prestamo);
-            nuevoPrestamo.id_libro = stoi(id_libro);
-            nuevoPrestamo.idUsuario = stoi(idUsuario);
-            nuevoPrestamo.fecha_prestamo = stoi(fecha_prestamo);
-            nuevoPrestamo.fecha_devolucion = stoi(fecha_devolucion);
+            string temp;
+            getline(ss, temp, ','); nuevoPrestamo.id_prestamo = stoi(temp);
+            getline(ss, temp, ','); nuevoPrestamo.id_libro = stoi(temp);
+            getline(ss, temp, ','); nuevoPrestamo.idUsuario = stoi(temp);
+            getline(ss, temp, ','); nuevoPrestamo.fecha_prestamo = stoi(temp);
+            getline(ss, temp, ','); nuevoPrestamo.fecha_devolucion = stoi(temp);
             prestamos.push_back(nuevoPrestamo);
         }
         archivoPrestamos.close();
     }
+
+    for (const auto& p : prestamos) {
+        for (auto& l : coleccion) {
+            if (l.id_libro == p.id_libro) {
+                if (p.fecha_devolucion == 0) {
+                    l.estaDisponible = false;
+                }
+                break;
+            }
+        }
+        for (auto& u : usuarios) {
+            if (u.idUsuario == p.idUsuario) {
+                if (p.fecha_devolucion == 0) u.prestamos.push_back(p);
+                break;
+            }
+        }
+    }
 }
 
-// Paso de definiciones:
-string toLowerCase(const string& str) {
+
+// Comienzo para definir mis promesas:
+string toLowerCase(const string& str) {     //Para minisculas para no tener problemas con titulos
     string lowerStr = str;
     for (char& c : lowerStr) {
         c = tolower(c);
@@ -216,18 +247,108 @@ string toLowerCase(const string& str) {
     return lowerStr;
 }
 
-void Biblioteca::agregarUsuario(const Usuario& nuevoUsuario) {    //Para meter usuarios
-    for (Usuario& usuario : usuarios) { //Para Buscar si ya existe el usuario que queria crear
+// Paso de definiciones:
+void Biblioteca::actualizarUsuario(int idUsuario) {
+    for (auto& usuario : usuarios) {
+        if (usuario.idUsuario == idUsuario) {
+            cout << "Actualizar usuario con ID: " << idUsuario << endl;
+            cout << "Nuevo nombre: ";
+            cin.ignore();
+            getline(cin, usuario.nombre);
+            cout << "Nuevo grado: ";
+            getline(cin, usuario.grado);
+            guardarUsuarios();
+            cout << "Usuario actualizado!!" << endl;
+            return;
+        }
+    }
+    cout << "Usuario con ID: " << idUsuario << " ,no encontrado" << endl;
+}
+
+void Biblioteca::eliminarUsuario(int idUsuario) {
+    auto it = remove_if(usuarios.begin(), usuarios.end(),
+                        [idUsuario](const Estudiante& u) { return u.idUsuario == idUsuario; });
+    if (it != usuarios.end()) {
+        usuarios.erase(it, usuarios.end());
+        auto prestamo_it = remove_if(prestamos.begin(), prestamos.end(),
+                                    [idUsuario](const Prestamo& p) { return p.idUsuario == idUsuario; });
+        prestamos.erase(prestamo_it, prestamos.end());
+        guardarUsuarios();
+        guardarPrestamos();
+        cout << "Usuario con ID: " << idUsuario << " ,eliminado" << endl;
+    } else {
+        cout << "Usuario con ID: " << idUsuario << " ,no encontrado" << endl;
+    }
+}
+
+void Biblioteca::agregarUsuario(const Estudiante& nuevoUsuario) {    //Para meter usuarios
+    for (const auto& usuario : usuarios) { //Para Buscar si ya existe el usuario que queria crear
         if (usuario.nombre == nuevoUsuario.nombre or usuario.idUsuario == nuevoUsuario.idUsuario) {
-            cout << "Ya esta registrado" << endl; // Si ya existe
+            cout << "Ya existe este usuario" << endl; // Si ya existe
             return;
         }
     }
     usuarios.push_back(nuevoUsuario); //Si no existe agregarlo.
+    guardarUsuarios();
     cout << "Usuario registrado" << endl;
 }
 
-Usuario* Biblioteca::buscarusuarios(const string& nombre) {      //Para buscar la gente
+void Biblioteca::actualizarAutor(int id_autor) {
+    for (auto& autor : autores) {
+        if (autor.id_autor == id_autor) {
+            cout << "Actualizar autor con ID: " << id_autor << endl;
+            cout << "Nuevo nombre: ";
+            cin.ignore();
+            getline(cin, autor.nombre);
+            cout << "Nueva nacionalidad: ";
+            getline(cin, autor.nacionalidad);
+            guardarAutores();
+            cout << "Autor actualizado!!!" << endl;
+            return;
+        }
+    }
+    cout << "Autor con ID: " << id_autor << " ,no encontrado" << endl;
+}
+
+void Biblioteca::mostrarAutoresConMasLibros() const {
+    if (autores.empty() || coleccion.empty()) {
+        cout << "No hay datos suficientes" << endl;
+        return;
+    }
+    vector<pair<string,int>> conteo;
+    conteo.reserve(autores.size());
+    for (const auto& a : autores) conteo.push_back({a.nombre, 0});
+    for (const auto& l : coleccion) {
+        for (auto& par : conteo) {
+            if (toLowerCase(l.nombreAutor) == toLowerCase(par.first)) {
+                par.second++;
+                break;
+            }
+        }
+    }
+    int maxc = 0;
+    for (const auto& par : conteo) if (par.second > maxc) maxc = par.second;
+    if (maxc == 0) {
+        cout << "No hay libros asociados a los autores registrados." << endl;
+        return;
+    }
+    cout << "El Autor con mas libros (" << maxc << "):" << endl;
+    for (const auto& par : conteo) if (par.second == maxc) cout << par.first << endl;
+}
+
+void Biblioteca::eliminarAutor(int id_autor) {
+    auto it = remove_if(autores.begin(), autores.end(),
+                        [id_autor](const Autor& a) { return a.id_autor == id_autor; });
+    if (it != autores.end()) {
+        autores.erase(it, autores.end());
+        guardarAutores();
+        cout << "Autor con ID: " << id_autor << " ,eliminado" << endl;
+    } else {
+        cout << "Autor con ID: " << id_autor << " ,no encontrado" << endl;
+    }
+}
+
+Estudiante* Biblioteca::buscarusuarios(const string& nombre) {      //Para buscar la gente osea los estudiantes
     for (auto& usuario : usuarios) {
         if (toLowerCase(usuario.nombre) == toLowerCase(nombre)) {
             return &usuario;
@@ -236,7 +357,7 @@ Usuario* Biblioteca::buscarusuarios(const string& nombre) {      //Para buscar l
     return nullptr;
 }
 
-void Biblioteca::mostrarUsuarios() const { // Para mostrar los usuarios
+void Biblioteca::mostrarUsuarios() const { // Para mostrar los usuarios, estudiantes en el programa
     if (usuarios.empty()) {
         cout << "No hay usuarios en la plataforma." << endl;
         return;
@@ -249,17 +370,18 @@ void Biblioteca::mostrarUsuarios() const { // Para mostrar los usuarios
 void Biblioteca::agregarAutor(const Autor& nuevoAutor) { //Meter mas autores
     for (const auto& autor : autores) {
         if (autor.id_autor == nuevoAutor.id_autor) {
-            cout << "Este autor ya está registrado." << endl;  //Si ya estan registramos
+            cout << "Este autor ya esta en la plataforma" << endl;  //Si ya estan registramos
             return;
         }
     }
     autores.push_back(nuevoAutor);
+    guardarAutores();
     cout << "Autor registrado" << endl; //Si no estaba y lo agregamos
 }
 
 void Biblioteca::mostrarAutor() const {     //Ensenamos los autores
     if (autores.empty()) {
-        cout << "No hay autores registrados." << endl;
+        cout << "No hay autores en la plataforma" << endl;
         return;
     }
     for (const auto& autor : autores) {
@@ -267,19 +389,25 @@ void Biblioteca::mostrarAutor() const {     //Ensenamos los autores
     }
 }
 
-void Biblioteca::agregarLibro(const Libro& nuevoLibro) {// Definicion de la promesa de agregar los libros
-    if (nuevoLibro.anioPublicacion <= 0 || nuevoLibro.anioPublicacion > 2025) {   //Validacion del anio como decia el feedback
+void Biblioteca::agregarLibro(const Libro& nuevoLibro) {          // Definicion de la promesa de agregar los libros
+    int currentYear = obtenerFechaActual() / 10000;
+    if (nuevoLibro.anioPublicacion <= 0 || nuevoLibro.anioPublicacion > currentYear) {   //Validacion del anio como decia el feedback
         cout << "Anio no vaido, no se admiten numeros imaginarios, negativos ni mayores al anio actual" << endl;
-        cout << "Libro no registrado, por anio invalido (el anio debe de estar entre 0 a 2025)" << endl;
+        cout << "Libro no registrado, por anio invalido (el anio debe de estar entre 0 a " << currentYear << ")" << endl;
         return;
     }
-    for (Libro& libro : coleccion) {
-        if (toLowerCase(libro.titulo) == toLowerCase(nuevoLibro.titulo)) {
-            cout << "Este libro ya existe en el inventario." << endl;   //Si el libro que se queria agregar ya existe
+    if (nuevoLibro.titulo.empty() || nuevoLibro.isbn.empty() || nuevoLibro.nombreAutor.empty()) {
+        cout << "Datos del libro incompletos" << endl;
+        return;
+    }
+    for (const auto& libro : coleccion) {
+        if (toLowerCase(libro.titulo) == toLowerCase(nuevoLibro.titulo) || libro.isbn == nuevoLibro.isbn) {
+            cout << "Este libro ya existe en el inventario" << endl;   //Si el libro que se queria agregar ya existe
             return;
         }
     }
     coleccion.push_back(nuevoLibro);
+    guardarLibros();
     cout << "Libro registrado " << endl;   //Si no existia y lo agregamos
 }
 
@@ -288,8 +416,8 @@ void Biblioteca::mostrarInventario() { //Ensenamos los libros
         cout << "No hay libros" << endl;
         return;
     }
-    for (Libro& libro : coleccion) {
-        libro.mostrarDetallesCompletos(autores);    //Si hay los mostramos
+    for (const auto& libro : coleccion) {
+        libro.mostrarDetallesCompletos();
     }
 }
 
@@ -308,6 +436,53 @@ bool esRespuestaValida(const string& respuesta) {    //Para evitar problemas de 
     return respuestaLower == "si" || respuestaLower == "no";
 }
 
+void Biblioteca::mostrarPrestamosPorEstudiante(int idEstudiante) {
+    bool estudianteEncontrado = false;
+    bool tienePrestamos = false;
+
+    for (const auto& usuario : usuarios) {
+        if (usuario.idUsuario == idEstudiante) {
+            estudianteEncontrado = true;
+            cout << "Estudiante: " << usuario.nombre << " - " << usuario.grado << endl;
+
+            for (const auto& prestamo : prestamos) {
+                if (prestamo.idUsuario == idEstudiante) {
+                    for (const auto& libro : coleccion) {
+                        if (libro.id_libro == prestamo.id_libro) {
+                            cout << "Libro: " << libro.titulo << endl;
+                            cout << "ID Libro: " << libro.id_libro << endl;
+                            cout << "Autor: " << libro.nombreAutor << endl;
+                            cout << "Fecha prestamo: " << prestamo.fecha_prestamo << endl;
+
+                            if (prestamo.fecha_devolucion == 0) {
+                                cout << "Fecha devolucion: PENDIENTE" << endl;
+                                cout << "Estado: PRESTADO ACTIVO" << endl;
+                            } else {
+                                cout << "Fecha devolucion: " << prestamo.fecha_devolucion << endl;
+                                cout << "Estado: DEVUELTO" << endl;
+                            }
+
+                            cout << "---------------------------------" << endl;
+                            tienePrestamos = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    if (!estudianteEncontrado) {
+        cout << "Error: No se encontro ningun estudiante con ID " << idEstudiante << endl;
+        return;
+    }
+
+    if (!tienePrestamos) {
+        cout << "Este estudiante no tiene prestamos registrados." << endl;
+    }
+}
+
 void Biblioteca::prestarLibro(const std::string &tituloPrestamo) {    //Si queremos un libro prestado
     Libro* libro = buscarLibro(tituloPrestamo);
     if (!libro) {
@@ -322,44 +497,52 @@ void Biblioteca::prestarLibro(const std::string &tituloPrestamo) {    //Si quere
 
     string nombreUsuario;
     cout << "Ingrese su usuario: ";     //Si el libro se encuentra registre su usuario para poder pedirlo prestado y que el chequeo lo indique como portador.
-    cin >> nombreUsuario;
+    getline(cin, nombreUsuario);
 
-    Usuario* usuario = buscarusuarios(nombreUsuario);
+    Estudiante* usuario = buscarusuarios(nombreUsuario);
     if (!usuario) {
         cout << "No lo encontramos" << endl;    //Si no tiene usuario
         return;
     }
 
     if (usuario->prestamos.size() >= 1) {
-        cout << "No puede tener más de 1 libro prestado." << endl;     //Limite de libros a prestar
+        cout << "No puedes tener mas de 1 libro prestado." << endl;     //Limite de libros a prestar
         return;
     }
 
     string respuesta;
-    cout << "El libro está disponible, quiere prestarlo? (si/no): ";    //Confirmacion
+    cout << "El libro esta disponible, quiere prestarlo? (si/no): ";    //Confirmacion
     cin >> respuesta;
 
-    if (respuesta != "si" && respuesta != "no") {
+    if (!esRespuestaValida(respuesta)) {
         cout << "Respuesta inválida." << endl;    //Validacion
         return;
     }
 
     if (toLowerCase(respuesta) == "si") {
         Prestamo nuevoPrestamo;
+        int nextId = 1;
+        for (const auto& p : prestamos) {
+            if (p.id_prestamo >= nextId) nextId = p.id_prestamo + 1;
+        }
+        nuevoPrestamo.id_prestamo = nextId;
         nuevoPrestamo.id_libro = libro->id_libro;
         nuevoPrestamo.idUsuario = usuario->idUsuario;
         nuevoPrestamo.fecha_prestamo = obtenerFechaActual() ;
         nuevoPrestamo.fecha_devolucion = 0;
 
         prestamos.push_back(nuevoPrestamo);
-
         libro->estaDisponible = false;
-        libro->usuario = nombreUsuario;
         usuario->prestamos.push_back(nuevoPrestamo);
 
-        cout << "Disfruta de tu libro " << libro->titulo << endl;   //Finalizacion
-    } else {
-        cout << "Cancelamos su préstamo" << endl;   //Cancelacion
+        guardarPrestamos();
+        guardarLibros();
+        guardarUsuarios();
+
+        cout << "Disfruta de tu libro!!! " << libro->titulo << endl;   //Finalizacion
+    } else
+    {
+        cout << "Cancelamos su prestamo, regrese pronto" << endl;   //Cancelacion
     }
 }
 
@@ -371,15 +554,15 @@ void Biblioteca::devolverLibro(const std::string& tituloDevolucion) {     //Cuan
     }
 
     if (libro->estaDisponible) {
-        cout << "Este libro está en el inventario, no ha sido prestado." << endl;    //Si el libro nunca salio
+        cout << "Este libro si esta en el inventario, no ha sido prestado" << endl;    //Si el libro nunca salio
         return;
     }
 
     string nombreUsuario;
     cout << "Ingrese su nombre de usuario para devolver el libro: ";    //Datos para poder limpiar el historial
-    cin >> nombreUsuario;
+    getline(cin, nombreUsuario);
 
-    Usuario* usuario = buscarusuarios(nombreUsuario);
+    Estudiante* usuario = buscarusuarios(nombreUsuario);
     if (!usuario) {
         cout << "Usuario no registrado" << endl;    //Error con el usuario que pidio el libro por falta de credenciales
         return;
@@ -393,36 +576,88 @@ void Biblioteca::devolverLibro(const std::string& tituloDevolucion) {     //Cuan
     if (it != usuario->prestamos.end()) {
         if (it->fecha_devolucion == 0) {
             it->fecha_devolucion = obtenerFechaActual();
+
+            auto itg = find_if(prestamos.begin(), prestamos.end(),   //actualiza el registro global
+                               [&libro, &usuario](const Prestamo& p) {
+                                   return p.id_libro == libro->id_libro && p.idUsuario == usuario->idUsuario && p.fecha_devolucion == 0;
+                               });
+            if (itg != prestamos.end()) {
+                itg->fecha_devolucion = it->fecha_devolucion;
+            }
         } else {
-            cout << "El libro ya ha sido devuelto previamente." << endl;   //Si el libro ya habia sido devuelto
+            cout << "El libro ya ha sido devuelto" << endl;   //Si el libro ya habia sido devuelto
             return;
         }
 
         usuario->prestamos.erase(it);
         libro->estaDisponible = true;
-        libro->usuario = "";
 
-        cout << "Libro devuelto." << endl;    //Confirmacion de proceso hecho
-    } else {
+        guardarPrestamos();
+        guardarLibros();
+        guardarUsuarios();
+
+        cout << "Libro devuelto" << endl;    //Confirmacion de proceso hecho
+    } else
+
+    {
         cout << "El libro no estaba registrado en este usuario" << endl; //Si se equivoco de usuario
     }
 }
 
-void Biblioteca::guardarLibros() {       //Guardar los libros en archivos txt
+void Biblioteca::actualizarLibro(int id_libro) {
+    for (auto& libro : coleccion) {
+        if (libro.id_libro == id_libro) {
+            cout << "Actulizar libro con ID: " << id_libro << endl;
+            cout << "Nuevo titulo: ";
+            cin.ignore();
+            getline(cin, libro.titulo);
+            cout << "Nuevo ISBN: ";
+            getline(cin, libro.isbn);
+            cout << "Nuevo anio de publicacion: ";
+            cin >> libro.anioPublicacion;
+            cout << "Nuevo nombre del autor: ";
+            cin.ignore();
+            getline(cin, libro.nombreAutor);
+            guardarLibros();
+            cout << "Libro actualizado!!!" << endl;
+            return;
+        }
+    }
+    cout << "Libro con ID: " << id_libro << " ,no encontrado" << endl;
+}
+
+void Biblioteca::eliminarLibro(int id_libro) {
+    auto it = remove_if(coleccion.begin(), coleccion.end(),
+                        [id_libro](const Libro& l) { return l.id_libro == id_libro; });
+    if (it != coleccion.end()) {
+        coleccion.erase(it, coleccion.end());
+        auto prestamo_it = remove_if(prestamos.begin(), prestamos.end(),
+                                    [id_libro](const Prestamo& p) { return p.id_libro == id_libro; });
+        prestamos.erase(prestamo_it, prestamos.end());
+        guardarLibros();
+        guardarPrestamos();
+        cout << "Libro con ID: " << id_libro << " ,eliminado" << endl;
+    } else {
+        cout << "Libro con ID: " << id_libro << " ,no encontrado" << endl;
+    }
+}
+
+void Biblioteca::guardarLibros() {      //Guarda todo el void en un txt, en diferentes
     ofstream archivo("libros.txt");
     if (archivo.is_open()) {
         for (const auto& libro : coleccion) {
             archivo << libro.id_libro << ","
                     << libro.titulo << ","
-                    << libro.id_autor << ","
-                    << libro.genero << ","
-                    << libro.estaDisponible << ","
+                    << libro.isbn << ","
                     << libro.anioPublicacion << ","
-                    << libro.usuario << endl;
+                    << libro.nombreAutor << ","
+                    << libro.estaDisponible << "\n";
         }
         archivo.close();
         cout << "Libros guardados" << endl;
-    } else {
+    } else
+
+    {
         cout << "Error" << endl;
     }
 }
@@ -437,18 +672,19 @@ void Biblioteca::guardarAutores() {          //Guardar los autores en un txt
         }
         archivo.close();
         cout << "Guardado autores" << endl;
-    } else {
+    } else
+    {
         cout << "Error" << endl;
     }
 }
 
 void Biblioteca::guardarUsuarios() {           //Guardar los usuarios en txt
-    ofstream archivo("usuarios.txt");
+    ofstream archivo("estudiantes.txt");
     if (archivo.is_open()) {
         for (const auto& usuario : usuarios) {
             archivo << usuario.idUsuario << ","
                     << usuario.nombre << ","
-                    << usuario.trabajo << endl;
+                    << usuario.grado << "\n";
         }
         archivo.close();
         cout << "Guardado" << endl;
@@ -469,31 +705,32 @@ void Biblioteca::guardarPrestamos() {      //Guardar los prestamos en txt
         }
         archivo.close();
         cout << "Guardado" << endl;
-    } else {
+    } else
+
+    {
         cout << "Error" << endl;
     }
 }
 
 int main() {
     Biblioteca miBiblioteca;
-
     miBiblioteca.cargarDatos();
 
-    string opcion;
+    int opcion;
 
     Libro libroInicial;
     libroInicial.titulo = "El Hobbit";
     libroInicial.id_libro = 1;
-    libroInicial.id_autor = 1;
-    libroInicial.genero = "Novela/Fantasia";
+    libroInicial.isbn = "454545454545455";
+    libroInicial.nombreAutor = "J.R.R. Tolkien";
     libroInicial.anioPublicacion = 1937;
     libroInicial.estaDisponible = true;
     miBiblioteca.agregarLibro(libroInicial);
 
-    Usuario usuarioInicial;
+    Estudiante usuarioInicial;
     usuarioInicial.nombre = "Diego Carpio";
-    usuarioInicial.trabajo = "Ingeniero Industrial";
-    usuarioInicial.idUsuario = 000011;
+    usuarioInicial.grado = "Segundo año General";
+    usuarioInicial.idUsuario = 11;
     miBiblioteca.agregarUsuario(usuarioInicial);
 
     Autor autorInicial;
@@ -502,125 +739,198 @@ int main() {
     autorInicial.nacionalidad = "Inglaterra";
     miBiblioteca.agregarAutor(autorInicial);
 
-    while (opcion != "9") {
+    while (true) {
         cout << "-----------------------------------------------" << endl;
-        cout << "1. Añadir libro" << endl;
+        cout << "1. Agregar libro" << endl;
         cout << "2. Mostrar inventario" << endl;
         cout << "3. Prestar libro" << endl;
         cout << "4. Devolver libro" << endl;
-        cout << "5. Añadir usuario" << endl;
-        cout << "6. Mostrar usuarios" << endl;
-        cout << "7. Añadir autor" << endl;
-        cout << "8. Mostrar autores" << endl;
-        cout << "9. Salir" << endl;
-        cout << "Seleccione una opción: ";
-        cin >> opcion;
+        cout << "5. Buscar prestamo por estudiante" << endl;
+        cout << "6. Agregar usuario" << endl;
+        cout << "7. Mostrar usuarios" << endl;
+        cout << "8. Agregar autor" << endl;
+        cout << "9. Mostrar autores" << endl;
+        cout << "10. Actualizar libro" << endl;
+        cout << "11. Eliminar libro" << endl;
+        cout << "12. Actualizar autor" << endl;
+        cout << "13. Eliminar autor" << endl;
+        cout << "14. Actualizar usuario" << endl;
+        cout << "15. Eliminar usuario" << endl;
+        cout << "16. Autores con mas libros" << endl;
+        cout << "17. Salir" << endl;
+        cout << "Seleccione una opcion (1-17): ";
 
-        switch (opcion[0]) {
-            case '1': {
-                string libro_nuevo, autor_libro, genero_libro;
-                int anioPublicacion, idAutor;
+        if (!(cin >> opcion)) {
+            cout << "Error: Por favor ingrese un numero valido." << endl;
+            cin.clear();
+            cin.ignore(10000, '\n');
+            continue;
+        }
+
+        switch (opcion) {
+            case 1: {
+                string titulo, isbn, nombreAutor;
+                int anioPublicacion;
                 Libro nuevo;
 
                 cin.ignore();
-                cout << "Título: ";
-                getline(cin, libro_nuevo);
-                cout << "ID del Autor: ";
-                cin >> idAutor;
-                cout << "Género: ";
-                cin.ignore();
-                getline(cin, genero_libro);
-                cout << "Año: ";
+                cout << "Titulo del libro: ";
+                getline(cin, titulo);
+                cout << "ISBN: ";
+                getline(cin, isbn);
+                cout << "Nombre del Autor: ";
+                getline(cin, nombreAutor);
+                cout << "Anio de publicacion: ";
                 cin >> anioPublicacion;
 
-                nuevo.titulo = libro_nuevo;
-                nuevo.id_autor = idAutor;
-                nuevo.genero = genero_libro;
+                nuevo.titulo = titulo;
+                nuevo.isbn = isbn;
+                nuevo.nombreAutor = nombreAutor;
                 nuevo.anioPublicacion = anioPublicacion;
+                nuevo.id_libro = miBiblioteca.generarIdLibro();
 
                 miBiblioteca.agregarLibro(nuevo);
                 break;
             }
 
-            case '2':
+            case 2:
                 miBiblioteca.mostrarInventario();
                 break;
 
-            case '3': {
+            case 3: {
                 string titulo;
                 cin.ignore();
-                cout << "Título del libro que desea prestar: ";
+                cout << "Titulo del libro que desea prestar: ";
                 getline(cin, titulo);
                 miBiblioteca.prestarLibro(titulo);
                 break;
             }
 
-            case '4': {
-                string devolver;
+            case 4: {
+                string titulo;
                 cin.ignore();
-                cout << "Qué libro desea devolver: ";
-                getline(cin, devolver);
-                miBiblioteca.devolverLibro(devolver);
+                cout << "Que libro desea devolver: ";
+                getline(cin, titulo);
+                miBiblioteca.devolverLibro(titulo);
                 break;
             }
 
-            case '5': {
-                string name, job;
-                int id;
-
-                Usuario reciente;
-                cin.ignore();
-                cout << "Nombre: ";
-                getline(cin, name);
-                cout << "Trabajo: ";
-                getline(cin, job);
-                cout << "ID: ";
-                cin >> id;
-
-                reciente.nombre = name;
-                reciente.trabajo = job;
-                reciente.idUsuario = id;
-                miBiblioteca.agregarUsuario(reciente);
+            case 5: {
+                int idEstudiante;
+                cout << "ID del estudiante: ";
+                cin >> idEstudiante;
+                miBiblioteca.mostrarPrestamosPorEstudiante(idEstudiante);
                 break;
             }
 
-            case '6': {
+            case 6: {
+                string nombre, grado;
+                Estudiante nuevo;
+
+                cin.ignore();
+                cout << "Nombre del estudiante: ";
+                getline(cin, nombre);
+                cout << "Grado: ";
+                getline(cin, grado);
+
+                nuevo.nombre = nombre;
+                nuevo.grado = grado;
+                nuevo.idUsuario = miBiblioteca.generarIdUsuario();
+                miBiblioteca.agregarUsuario(nuevo);
+                break;
+            }
+
+            case 7:
                 miBiblioteca.mostrarUsuarios();
                 break;
-            }
 
-            case '7': {
-                string nombreAutor, paisAutor;
-                int idAutor;
-                Autor nuevoAutor;
+            case 8: {
+                string nombre, nacionalidad;
+                Autor nuevo;
 
                 cin.ignore();
                 cout << "Nombre del autor: ";
-                getline(cin, nombreAutor);
-                cout << "País del autor: ";
-                getline(cin, paisAutor);
-                cout << "ID del autor: ";
-                cin >> idAutor;
+                getline(cin, nombre);
+                cout << "Nacionalidad: ";
+                getline(cin, nacionalidad);
 
-                nuevoAutor.id_autor = idAutor;
-                nuevoAutor.nombre = nombreAutor;
-                nuevoAutor.nacionalidad = paisAutor;
-                miBiblioteca.agregarAutor(nuevoAutor);
+                nuevo.nombre = nombre;
+                nuevo.nacionalidad = nacionalidad;
+                nuevo.id_autor = miBiblioteca.generarIdAutor();
+                miBiblioteca.agregarAutor(nuevo);
                 break;
             }
 
-            case '8': {
+            case 9:
                 miBiblioteca.mostrarAutor();
                 break;
+
+            case 10: {
+                int id;
+                cout << "ID del libro a actualizar: ";
+                cin >> id;
+                miBiblioteca.actualizarLibro(id);
+                break;
             }
 
-            case '9':
-                cout << "Gracias por venir" << endl;
+            case 11: {
+                int id;
+                cout << "ID del libro a eliminar: ";
+                cin >> id;
+                miBiblioteca.eliminarLibro(id);
+                break;
+            }
+
+            case 12: {
+                int id;
+                cout << "ID del autor a actualizar: ";
+                cin >> id;
+                miBiblioteca.actualizarAutor(id);
+                break;
+            }
+
+            case 13: {
+                int id;
+                cout << "ID del autor a eliminar: ";
+                cin >> id;
+                miBiblioteca.eliminarAutor(id);
+                break;
+            }
+
+            case 14: {
+                int id;
+                cout << "ID del usuario a actualizar: ";
+                cin >> id;
+                miBiblioteca.actualizarUsuario(id);
+                break;
+            }
+
+            case 15: {
+                int id;
+                cout << "ID del usuario a eliminar: ";
+                cin >> id;
+                miBiblioteca.eliminarUsuario(id);
+                break;
+            }
+
+            case 16:
+                miBiblioteca.mostrarAutoresConMasLibros();
                 break;
 
+            case 17:
+                miBiblioteca.guardarLibros();
+                miBiblioteca.guardarAutores();
+                miBiblioteca.guardarUsuarios();
+                miBiblioteca.guardarPrestamos();
+                cout << "Gracias por venir" << endl;
+                return 0;
+
             default:
-                cout << "Opcion no valida" << endl;
+                cout << "Opcion no valida. Intente de nuevo." << endl;
+                break;
         }
+
+        cin.ignore(10000, '\n');
     }
     return 0;
 }
